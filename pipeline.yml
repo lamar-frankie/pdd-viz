@@ -514,7 +514,6 @@ jobs:
           - get: data_minimization-image
           - get: concourse-image # The actual product image resource
           - get: postgres-image
-          - get: vault-image
           - get: ci
       - task: integration # Task name
         config: *mock_task_config
