@@ -112,6 +112,47 @@ mock_task_config: &mock_task_config
 mock_put_params: &mock_put_params
   signal_value: "mock_event_$(echo $BUILD_JOB_NAME)_$(date +%s)"
 
+random_status_mock_task_config: &random_status_mock_task_config
+  platform: linux
+  image_resource:
+    type: registry-image
+    source: { repository: busybox, tag: latest } # busybox has sh, echo, sleep, awk, /dev/urandom
+  run:
+    path: sh
+    args:
+      - -exc
+      - |
+        task_label_for_echo="$BUILD_JOB_NAME/task_in_build_$BUILD_NAME"
+        if [ -n "$BUILD_TASK_NAME" ]; then
+          task_label_for_echo="$BUILD_JOB_NAME/$BUILD_TASK_NAME"
+        fi
+        echo "Mocking task with random status: $task_label_for_echo"
+
+        # Generate random sleep time between 1 and 6 seconds using awk
+        # awk srand() uses time of day, which is fine for this.
+        sleep_duration=$(awk 'BEGIN{srand(); print int(rand()*6)+1}')
+        echo "Will sleep for $sleep_duration seconds."
+        sleep $sleep_duration
+
+        # Generate random number (0-99) for status decision
+        # Using /dev/urandom and od for better randomness if available, fallback to awk
+        random_value=$( (od -An -N1 -i /dev/urandom | awk '{print $1 % 100}' 2>/dev/null) || awk 'BEGIN{srand(); print int(rand()*100)}' )
+
+        # Ensure random_value is non-negative (important if od output was negative)
+        if [ "$random_value" -lt 0 ]; then
+          random_value=$((random_value * -1))
+        fi
+        random_value=$((random_value % 100))
+
+        echo "Random decision value: $random_value"
+
+        if [ "$random_value" -lt 60 ]; then # 60% chance of success
+          echo "Mock task $task_label_for_echo finishing successfully."
+          exit 0
+        else # 40% chance of failure
+          echo "Mock task $task_label_for_echo finishing with failure/error."
+          exit 1
+        fi
 
 resources:
   # All original resources are now of type dummy-signal.
@@ -302,7 +343,7 @@ jobs:
       - get: demo-kickoff-timer # Example: Start chain from timer
         trigger: true
       - task: build # Task name in plan step kept
-        config: *mock_task_config
+        config: *random_status_mock_task_config
       - put: data_minimization-image # Resource name kept
         params: *mock_put_params
 
@@ -325,9 +366,9 @@ jobs:
       #   file: golang-linux/version
       #   reveal: true
       - task: mock-load-var-go_version
-        config: *mock_task_config
+        config: *random_status_mock_task_config
       - task: build # Original task name in plan
-        config: *mock_task_config
+        config: *random_status_mock_task_config
       - put: golang-builder-image
         params: *mock_put_params
 
@@ -380,7 +421,7 @@ jobs:
         passed: [data_minimization]
         trigger: true
       - task: build # Task name in plan
-        config: *mock_task_config
+        config: *random_status_mock_task_config
       - put: resource-types-image
         params: *mock_put_params
 
@@ -411,15 +452,15 @@ jobs:
           fail_fast: true
           steps:
             - task: yarn-build
-              config: *mock_task_config
+              config: *random_status_mock_task_config
             - task: fly-linux
-              config: *mock_task_config
+              config: *random_status_mock_task_config
             - task: fly-windows
-              config: *mock_task_config
+              config: *random_status_mock_task_config
             - task: fly-darwin
-              config: *mock_task_config
+              config: *random_status_mock_task_config
       - task: build # Task name from original
-        config: *mock_task_config
+        config: *random_status_mock_task_config
       - put: basic_internal_privacy_policy
         params: *mock_put_params
 
@@ -612,14 +653,14 @@ jobs:
           - get: ci
       - try:
           task: try-delete-valid_business_justification
-          config: *mock_task_config
+          config: *random_status_mock_task_config
       - task: deploy-valid_business_justification
-        config: *mock_task_config
+        config: *random_status_mock_task_config
       - task: run-valid_business_justification-tests
-        config: *mock_task_config
+        config: *random_status_mock_task_config
         ensure:
           task: delete-valid_business_justification-ensure
-          config: *mock_task_config
+          config: *random_status_mock_task_config
 
   - name: service_data_justification
     public: true
@@ -648,7 +689,7 @@ jobs:
             tags: [service_data_justification]
       - task: service_data_justification # Task name in plan
         tags: [service_data_justification]
-        config: *mock_task_config
+        config: *random_status_mock_task_config
 
   - name: ggcm_justification
     public: true
@@ -669,7 +710,7 @@ jobs:
             # trigger: true
           - get: ci
       - task: check-helm-params # Task name in plan
-        config: *mock_task_config
+        config: *random_status_mock_task_config
 
   - name: enterprise_customers
     public: true
@@ -686,7 +727,7 @@ jobs:
           - get: ci
           - get: docs
       - task: enterprise_customers # Task name in plan
-        config: *mock_task_config
+        config: *random_status_mock_task_config
 
   - name: marc-is-cool
     public: true
@@ -774,7 +815,7 @@ jobs:
             # trigger: true
           - get: ci
       - task: check-bosh-props # Task name in plan
-        config: *mock_task_config
+        config: *random_status_mock_task_config
 
   - name: sharing_disabled
     public: true
@@ -794,7 +835,7 @@ jobs:
           - get: concourse-release-repo # BOSH release git repo
           - get: ci
       - task: bump-concourse-blobs # Task name in plan
-        config: *mock_task_config
+        config: *random_status_mock_task_config
       - put: concourse-release-repo # Output to the BOSH release git repo (mocked)
         params: *mock_put_params
 
@@ -829,7 +870,7 @@ jobs:
           - get: ci
       - task: upload-bosh-releases # Task name in plan
         tags: [bosh]
-        config: *mock_task_config
+        config: *random_status_mock_task_config
 
   - name: gin-logging
     public: true
@@ -860,10 +901,10 @@ jobs:
         # Original complex params removed
       - task: discover-bosh-endpoint-info-containerd # Renamed
         tags: [bosh]
-        config: *mock_task_config
+        config: *random_status_mock_task_config
       - task: smoke-bosh-containerd # Renamed
         tags: [bosh]
-        config: *mock_task_config
+        config: *random_status_mock_task_config
         # timeout: 1h # Removed
 
   - name: bosh-smoke-guardian
@@ -895,10 +936,10 @@ jobs:
         # Original complex params removed
       - task: discover-bosh-endpoint-info-guardian # Renamed
         tags: [bosh]
-        config: *mock_task_config
+        config: *random_status_mock_task_config
       - task: smoke-bosh-guardian # Renamed
         tags: [bosh]
-        config: *mock_task_config
+        config: *random_status_mock_task_config
         # timeout: 1h # Removed
 
   - name: bosh-topgun-core
@@ -921,7 +962,7 @@ jobs:
           - get: ci
       - task: bosh-topgun-core-run # Renamed
         tags: [bosh]
-        config: *mock_task_config
+        config: *random_status_mock_task_config
 
   - name: bosh-topgun-runtime
     public: true
@@ -940,7 +981,7 @@ jobs:
           - get: ci
       - task: bosh-topgun-runtime-run # Renamed
         tags: [bosh]
-        config: *mock_task_config
+        config: *random_status_mock_task_config
 
   - name: bosh-topgun-both
     public: true
@@ -959,7 +1000,7 @@ jobs:
           - get: ci
       - task: bosh-topgun-both-run # Renamed
         tags: [bosh]
-        config: *mock_task_config
+        config: *random_status_mock_task_config
 
   - name: bosh-topgun-pcf
     public: true
@@ -984,7 +1025,7 @@ jobs:
           - get: infrastructure # Added to make the job interact with this resource
       - task: bosh-topgun-pcf-run # Renamed
         tags: [bosh]
-        config: *mock_task_config
+        config: *random_status_mock_task_config
 
   # --- Final bump jobs (example structure) ---
   - name: service_data_protection_enabled # Final job, assuming it depends on all BOSH tests
