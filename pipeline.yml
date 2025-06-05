@@ -103,7 +103,7 @@ mock_task_config: &mock_task_config
         fi
         echo "Mocking task: $task_label_for_echo"
         # Generate random sleep time between 1 and 4 seconds using awk
-        sleep_duration=$(awk 'BEGIN{srand(); print int(rand()*4)+1}')
+        sleep_duration=$(awk 'BEGIN{srand(); print int(rand()*5)+2}')
         echo "Will sleep for $sleep_duration seconds."
         sleep $sleep_duration
         echo "Mock task $task_label_for_echo finished successfully."
