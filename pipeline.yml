@@ -1,0 +1,1036 @@
+display:
+  background_image: https://storage.googleapis.com/concourse-media-assets/concourse-emi-background-clean.png
+
+resource_types:
+  - name: dummy-signal
+    type: registry-image
+    source:
+      repository: concourse/resource-types-mock  # Using a mock resource image
+      tag: 'latest'
+
+# Mock signal resource script (to be implemented in the image)
+# set -e
+# # First arg ($1) is source directory (from task outputs), not used here as params drive the version.
+# # Params for the 'put' are passed as JSON via stdin. We expect 'params.signal_value'.
+# INPUT_JSON=$(cat /dev/stdin)
+# SIGNAL_VALUE=$(echo "$INPUT_JSON" | jq -r '.params.signal_value // "default_signal"')
+# # Using nanoseconds from 'date' for better uniqueness if available, fallback to seconds
+# CURRENT_TIMESTAMP=$(date +%s%N 2>/dev/null || date +%s)
+# jq -n \
+#   --arg sv "$SIGNAL_VALUE" \
+#   --arg ts "$CURRENT_TIMESTAMP" \
+#   '{version: {signal_id: $sv, timestamp: $ts}}'
+
+groups:
+  - name: collection
+    jobs:
+      - data_minimization
+      - basic_internal_privacy_policy
+      - integration
+      - testflight
+      - worker-runtime
+      - watsjs
+      - data_descriptions
+      - data_catagories
+      - marc-is-cool
+      - rapid_check
+      - customer_core_concent
+      - service_data_protection_enabled # Original had bump-prod-*, this will catch if named exactly
+      - customer_defined_attributes
+
+  - name: processing
+    jobs:
+      - enterprise_customers
+
+  - name: use
+    jobs: # These were globs, list specific jobs if known, or adjust glob if needed
+      - valid_business_justification
+      - service_data_justification
+      - ggcm_justification
+
+  - name: access_sharing
+    jobs: # These were globs
+      - jamie-rocks
+      - sharing_disabled
+      - gcp_tos_check
+      - gin-logging
+      - bosh-smoke-guardian
+      - bosh-topgun-core
+      - bosh-topgun-runtime
+      - bosh-topgun-both
+      - bosh-topgun-pcf
+
+  - name: notice_consent
+    jobs:
+      - basic_internal_privacy_policy
+      - resource-types-images
+      - data_minimization-image
+      - jeanette-was-here
+
+  - name: portability
+    jobs:
+      - basic_internal_privacy_policy
+      - resource-types-images
+      - data_minimization-image
+      - jeanette-was-here
+
+  - name: retention_wipeout
+    jobs:
+      - basic_internal_privacy_policy
+      - resource-types-images
+      - data_minimization-image
+      - jeanette-was-here
+
+  - name: all # This group can remain to show all jobs
+    jobs:
+      - "*"
+
+# Helper for mock task configuration
+mock_task_config: &mock_task_config
+  platform: linux
+  image_resource:
+    type: registry-image # This refers to Concourse's built-in ability to pull images
+    source: { repository: busybox, tag: latest } # busybox has sh, echo, sleep, awk
+  run:
+    path: sh
+    args:
+      - -exc
+      - |
+        task_label_for_echo="$BUILD_JOB_NAME/task_in_build_$BUILD_NAME"
+        # For 'across' tasks, BUILD_TASK_NAME might contain the variable values
+        if [ -n "$BUILD_TASK_NAME" ]; then
+          task_label_for_echo="$BUILD_JOB_NAME/$BUILD_TASK_NAME"
+        fi
+        echo "Mocking task: $task_label_for_echo"
+        # Generate random sleep time between 1 and 4 seconds using awk
+        sleep_duration=$(awk 'BEGIN{srand(); print int(rand()*4)+1}')
+        echo "Will sleep for $sleep_duration seconds."
+        sleep $sleep_duration
+        echo "Mock task $task_label_for_echo finished successfully."
+
+# Helper for mock put steps
+mock_put_params: &mock_put_params
+  signal_value: "mock_event_$(echo $BUILD_JOB_NAME)_$(date +%s)"
+
+
+resources:
+  # All original resources are now of type dummy-signal.
+  # Names and icons are preserved for visual consistency.
+  # Original 'source' configurations are removed.
+
+  # --- Git resources (now dummy-signal) ---
+  - name: concourse
+    type: dummy-signal
+    icon: &git-icon github
+  - name: ci
+    type: dummy-signal
+    icon: *git-icon
+  - name: ci-data_minimization-image
+    type: dummy-signal
+    icon: *git-icon
+  - name: infrastructure
+    type: dummy-signal
+    icon: github
+  - name: infrastructure-bump
+    type: dummy-signal
+    icon: github
+  - name: docs
+    type: dummy-signal
+    icon: *git-icon
+  - name: concourse-release-repo
+    type: dummy-signal
+    icon: *git-icon
+  - name: concourse-docker
+    type: dummy-signal
+    icon: *git-icon
+  - name: concourse-chart
+    type: dummy-signal
+    icon: *git-icon
+  - name: postgresql-chart-git # Was a git resource for helm chart
+    type: dummy-signal
+    icon: *git-icon # Keeping git icon for simplicity
+
+  # --- Registry-image resources (now dummy-signal) ---
+  - name: basic_internal_privacy_policy
+    type: dummy-signal
+    icon: &image-icon docker
+  - name: concourse-image
+    type: dummy-signal
+    icon: *image-icon
+  - name: data_minimization-image # This was used as both a resource and an image for tasks
+    type: dummy-signal
+    icon: *image-icon
+  - name: golang-builder-image
+    type: dummy-signal
+    icon: *image-icon
+  - name: postgres-image
+    type: dummy-signal
+    icon: *image-icon
+  - name: postgres-image-legacy
+    type: dummy-signal
+    icon: *image-icon
+  - name: vault-image
+    type: dummy-signal
+    icon: *image-icon
+  - name: mock-resource # Was concourse/mock-resource
+    type: dummy-signal
+    icon: &release-icon package-variant-closed # Using a common release icon
+  - name: docker-image-resource # Was concourse/docker-image-resource
+    type: dummy-signal
+    icon: *release-icon
+  - name: git-resource # Was concourse/git-resource
+    type: dummy-signal
+    icon: *release-icon
+  - name: github-release-resource # Was concourse/github-release-resource
+    type: dummy-signal
+    icon: *release-icon
+  - name: registry-image-resource # Was concourse/registry-image-resource
+    type: dummy-signal
+    icon: *release-icon
+  # Removed unused time-resource definition
+  - name: oci-build-task # Was an image resource for tasks
+    type: dummy-signal
+    icon: *image-icon
+  - name: resource-types-image # Was concourse/resource-types
+    type: dummy-signal
+    icon: *image-icon
+  - name: concourse-basic_internal_privacy_policy # Was concourse/concourse-dev
+    type: dummy-signal
+    icon: *image-icon
+  - name: wolfi-base # Was cgr.dev/chainguard/wolfi-base
+    type: dummy-signal
+    icon: *image-icon
+
+  # --- Github-release resources (now dummy-signal) ---
+  - name: bbr
+    type: dummy-signal
+    icon: *release-icon
+  - name: containerd
+    type: dummy-signal
+    icon: *release-icon
+  - name: runc
+    type: dummy-signal
+    icon: *release-icon
+  - name: dumb-init
+    type: dummy-signal
+    icon: *release-icon
+  - name: gdn
+    type: dummy-signal
+    icon: *release-icon
+  - name: cni
+    type: dummy-signal
+    icon: *release-icon
+
+  # --- GCS / S3 resources (now dummy-signal) ---
+  - name: linux-dev
+    type: dummy-signal
+    icon: linux
+  - name: windows-dev
+    type: dummy-signal
+    icon: microsoft-windows
+  - name: darwin-dev
+    type: dummy-signal
+    icon: apple
+  - name: golang-linux # Was S3
+    type: dummy-signal
+    icon: language-go
+
+  # --- BOSH related resources (now dummy-signal) ---
+  - name: concourse-release # Was bosh-release
+    type: dummy-signal
+    icon: *release-icon
+  - name: postgres-release # Was bosh-io-release
+    type: dummy-signal
+    icon: *release-icon
+  - name: postgres-bbr-compatible-release # Was bosh-io-release
+    type: dummy-signal
+    icon: *release-icon
+  - name: bpm-release # Was bosh-io-release
+    type: dummy-signal
+    icon: *release-icon
+  - name: bbr-sdk-release # Was bosh-io-release
+    type: dummy-signal
+    icon: *release-icon
+  - name: vault-release # Was bosh-io-release
+    type: dummy-signal
+    icon: *release-icon
+  - name: credhub-release # Was bosh-io-release
+    type: dummy-signal
+    icon: *release-icon
+  - name: uaa-release # Was bosh-io-release
+    type: dummy-signal
+    icon: *release-icon
+  - name: smoke-deployment # Was bosh-deployment
+    type: dummy-signal
+    tags: [bosh] # Tags preserved
+    icon: fire
+  - name: smoke-deployment-guardian # Was bosh-deployment
+    type: dummy-signal
+    tags: [bosh]
+    icon: fire
+  - name: gcp-jammy-stemcell # Was bosh-io-stemcell
+    type: dummy-signal
+    icon: *release-icon
+
+  # --- Helm resources (now dummy-signal) ---
+  - name: prometheus-chart # Was helm-chart
+    type: dummy-signal
+    icon: &helm-icon ship-wheel
+
+  # A time resource to kick things off if desired
+  - name: demo-kickoff-timer
+    type: time # This is a built-in type, no need to make it dummy-signal unless abstracting everything
+    icon: clock-outline
+    source: {interval: 30m} # Or 'never' if manual trigger is preferred for first job
+
+jobs:
+  # All jobs will have their tasks replaced by the mock_task_config.
+  # 'get' and 'put' steps will use the dummy-signal resources.
+  # Original dependencies ('passed', 'trigger') are maintained.
+
+  - name: data_minimization-image # Job name from original
+    public: true
+    serial: true
+    plan:
+      - in_parallel:
+          - get: ci-data_minimization-image # Resource name kept, now type dummy-signal
+            # trigger: true # For demo, let's make triggers more explicit or chain from a single start
+          - get: oci-build-task
+          - get: golang-builder-image
+            # trigger: true
+            # params: { format: oci } # Removed for dummy-signal
+      - get: demo-kickoff-timer # Example: Start chain from timer
+        trigger: true
+      - task: build # Task name in plan step kept
+        config: *mock_task_config
+      - put: data_minimization-image # Resource name kept
+        params: *mock_put_params
+
+  - name: jeanette-was-here
+    public: true
+    serial: true
+    plan:
+      - in_parallel:
+          - get: ci
+          - get: oci-build-task
+          - get: golang-linux
+            # trigger: true
+          - get: wolfi-base
+            # trigger: true
+            # params: { format: oci-layout } # Removed
+      - get: data_minimization-image # Example: chain from previous job
+        passed: [data_minimization-image]
+        trigger: true
+      # - load_var: go_version # Replaced with a mock task
+      #   file: golang-linux/version
+      #   reveal: true
+      - task: mock-load-var-go_version
+        config: *mock_task_config
+      - task: build # Original task name in plan
+        config: *mock_task_config
+      - put: golang-builder-image
+        params: *mock_put_params
+
+  - name: data_minimization
+    public: true
+    serial: true
+    plan:
+      - in_parallel:
+          - get: concourse
+            # trigger: true
+          - get: data_minimization-image
+            passed: [jeanette-was-here] # Chaining
+            trigger: true
+          - get: ci
+      - task: yarn-test
+        config: *mock_task_config
+      - in_parallel:
+          - task: data_minimization # Task name in plan
+            config: *mock_task_config
+          - task: fly-windows
+            config: *mock_task_config
+          - task: data_minimization-baggageclaim
+            config: *mock_task_config
+          - task: data_minimization-baggageclaim-windows
+            config: *mock_task_config
+      - put: concourse # Example output, can trigger next job
+        resource: concourse # Ensure this dummy-signal resource exists
+        params: *mock_put_params
+
+
+  - name: resource-types-images
+    public: true
+    serial: true
+    plan:
+      - in_parallel:
+          - get: oci-build-task
+          - get: ci
+          - get: registry-image-resource
+            # trigger: true
+          - get: docker-image-resource
+            # trigger: true
+          - get: git-resource
+            # trigger: true
+          - get: mock-resource
+            # trigger: true
+          # ... (other gets converted to dummy-signal, triggers removed for linear demo flow) ...
+          - get: github-release-resource
+            # trigger: true
+      - get: concourse # Chaining from 'data_minimization' job's output
+        passed: [data_minimization]
+        trigger: true
+      - task: build # Task name in plan
+        config: *mock_task_config
+      - put: resource-types-image
+        params: *mock_put_params
+
+  - name: basic_internal_privacy_policy
+    public: true
+    serial: true
+    plan:
+      - in_parallel:
+          fail_fast: true # Kept
+          steps:
+            - get: concourse
+              passed: [resource-types-images] # Chaining
+              trigger: true
+            - get: golang-builder-image
+              # trigger: true (original had alias and params for rootfs/oci-layout)
+            - get: containerd
+            - get: runc
+            - get: gdn
+            - get: cni
+            - get: dumb-init
+            - get: resource-types-image # This is an output of 'resource-types-images' job
+              # passed: [resource-types-images] # Already implied by concourse get
+              # trigger: true
+            - get: data_minimization-image # This is an output of 'data_minimization-image' job
+            - get: oci-build-task
+            - get: ci
+      - in_parallel:
+          fail_fast: true
+          steps:
+            - task: yarn-build
+              config: *mock_task_config
+            - task: fly-linux
+              config: *mock_task_config
+            - task: fly-windows
+              config: *mock_task_config
+            - task: fly-darwin
+              config: *mock_task_config
+      - task: build # Task name from original
+        config: *mock_task_config
+      - put: basic_internal_privacy_policy
+        params: *mock_put_params
+
+  - name: worker-runtime
+    public: true
+    max_in_flight: 1
+    plan:
+      - in_parallel:
+          - get: concourse
+            passed: [basic_internal_privacy_policy] # Waiting for basic_internal_privacy_policy to be built
+            trigger: true
+          # - get: basic_internal_privacy_policy # This is the output of 'basic_internal_privacy_policy' job
+          #   passed: [basic_internal_privacy_policy]
+          #   trigger: true (already triggered by 'concourse' get if basic_internal_privacy_policy job outputs to 'concourse' resource)
+          - get: ci
+      - task: integration # Task name
+        config: *mock_task_config
+        # timeout: 1h # Removed for demo
+
+  - name: customer_core_concent
+    public: true
+    max_in_flight: 1
+    plan:
+      - get: concourse # Assume basic_internal_privacy_policy job also produces/updates 'concourse' resource
+        passed: [basic_internal_privacy_policy]
+        trigger: true
+      - get: data_minimization-image
+      - get: ci
+      - task: docker-mounts
+        config: *mock_task_config
+
+  - name: testflight
+    public: true
+    max_in_flight: 2
+    plan:
+      - in_parallel:
+          - get: concourse # Assume basic_internal_privacy_policy job updates 'concourse'
+            passed: [basic_internal_privacy_policy, worker-runtime, customer_core_concent] # Example: wait for multiple upstream
+            trigger: true
+          - get: data_minimization-image
+          - get: basic_internal_privacy_policy
+          #   passed: [basic_internal_privacy_policy] # Already covered by 'concourse' get dependency
+          #   trigger: true
+          - get: postgres-image
+          - get: postgres-image-legacy
+          - get: ci
+      - across:
+          - var: runtime_var # Renamed to avoid conflict with any 'runtime' resource if one existed
+            values:
+              - guardian
+              - containerd
+            max_in_flight: all
+          - var: postgres_image_var # Renamed
+            values:
+              - postgres-image # These are now just strings for the loop
+              - postgres-image-legacy
+            max_in_flight: all
+        task: testflight-mock-((.:runtime_var))-((.:postgres_image_var)) # Dynamic task name for UI clarity
+        config: *mock_task_config
+        # Original params and input_mapping removed
+
+  - name: watsjs
+    public: true
+    max_in_flight: 2
+    plan:
+      - in_parallel:
+          - get: concourse
+            passed: [testflight] # Depends on testflight
+            trigger: true
+          - get: data_minimization-image
+          - get: basic_internal_privacy_policy
+          #   passed: [basic_internal_privacy_policy]
+          #   trigger: true
+          - get: postgres-image
+          - get: ci
+      - task: watsjs
+        attempts: 1 # Reduced from 3 for demo
+        config: *mock_task_config
+        # timeout: 1h # Removed
+
+  - name: integration # This is a different 'integration' job
+    public: true
+    serial: true
+    plan:
+      - in_parallel:
+          - get: concourse
+            passed: [watsjs] # Depends on watsjs
+            trigger: true
+          - get: basic_internal_privacy_policy
+          #   passed: [basic_internal_privacy_policy]
+          #   trigger: true
+          - get: data_minimization-image
+          - get: concourse-image # The actual product image resource
+          - get: postgres-image
+          - get: vault-image
+          - get: ci
+      - task: integration # Task name
+        config: *mock_task_config
+      - put: concourse-image # Example: this job "produces" the main image
+        params: *mock_put_params
+
+
+  - name: data_descriptions # Formerly build-rc
+    public: true
+    serial: true
+    plan:
+      - in_parallel:
+          - get: concourse # This likely represents the source code
+            passed: [integration] # Depends on the 'integration' job
+            trigger: true
+          - get: data_minimization-image
+          - get: basic_internal_privacy_policy
+            # passed: [basic_internal_privacy_policy]
+            # trigger: true
+          - get: golang-builder-image
+            # passed: [basic_internal_privacy_policy]
+          - get: ci
+          - get: resource-types-image
+            # passed: [basic_internal_privacy_policy]
+      - in_parallel:
+          - task: fly-linux-build # Renamed for clarity
+            config: *mock_task_config
+          - task: fly-windows-build
+            config: *mock_task_config
+          - task: fly-darwin-build
+            config: *mock_task_config
+      - in_parallel:
+          fail_fast: true
+          steps:
+            - task: hoist-linux-dependencies
+              config: *mock_task_config
+            - task: hoist-resource-types-ubuntu
+              config: *mock_task_config
+            - task: yarn-build-for-rc # Renamed
+              config: *mock_task_config
+      - task: get-dev-version # Mocking this task
+        config: *mock_task_config
+      - in_parallel:
+          fail_fast: true
+          steps:
+            - task: concourse-linux-final-build # Renamed
+              config: *mock_task_config
+            - task: concourse-windows-final-build
+              config: *mock_task_config
+            - task: concourse-darwin-final-build
+              config: *mock_task_config
+      - in_parallel:
+          - put: linux-dev
+            params: *mock_put_params
+          - put: windows-dev
+            params: *mock_put_params
+          - put: darwin-dev
+            params: *mock_put_params
+
+  - name: data_catagories # Formerly build-rc-image
+    public: true
+    serial: true
+    plan:
+      - in_parallel:
+          - get: concourse # Source code
+            passed: [data_descriptions] # Depends on the binaries being built
+            trigger: true
+          - get: data_minimization-image
+          - get: linux-dev # Binary from data_descriptions
+            trigger: true # Already covered by 'concourse' get
+            # passed: [data_descriptions]
+          - get: concourse-docker # Dockerfile repo
+            trigger: true
+          - get: oci-build-task # Build tool image
+          - get: ci
+      - task: build-final-image # Renamed task in plan
+        config: *mock_task_config
+      - put: concourse-basic_internal_privacy_policy # This is the final image pushed to a registry (mocked)
+        params: *mock_put_params
+
+
+  - name: valid_business_justification
+    public: true
+    serial: true
+    plan:
+      - in_parallel:
+          - get: concourse # Source code or trigger from image build
+            passed: [data_catagories] # Depends on the final image
+            trigger: true
+          - get: concourse-basic_internal_privacy_policy # The image to test
+            # passed:  data_catagories] # Already covered by 'concourse' get
+            # trigger: true
+          - get: concourse-chart # Helm chart
+            trigger: true
+          - get: data_minimization-image # For running tasks
+          - get: ci
+      - try:
+          task: try-delete-valid_business_justification
+          config: *mock_task_config
+      - task: deploy-valid_business_justification
+        config: *mock_task_config
+      - task: run-valid_business_justification-tests
+        config: *mock_task_config
+        ensure:
+          task: delete-valid_business_justification-ensure
+          config: *mock_task_config
+
+  - name: service_data_justification
+    public: true
+    serial: true
+    plan:
+      - in_parallel:
+          - get: concourse
+            passed: [valid_business_justification]
+            tags: [service_data_justification]
+            trigger: true
+          - get: concourse-basic_internal_privacy_policy
+            # passed: [valid_business_justification]
+            tags: [service_data_justification]
+            # trigger: true
+          - get: data_minimization-image
+            tags: [service_data_justification]
+          - get: concourse-chart
+            # passed: [valid_business_justification]
+            tags: [service_data_justification]
+            # trigger: true
+          - get: prometheus-chart
+            tags: [service_data_justification]
+          - get: postgresql-chart-git
+            tags: [service_data_justification]
+          - get: ci
+            tags: [service_data_justification]
+      - task: service_data_justification # Task name in plan
+        tags: [service_data_justification]
+        config: *mock_task_config
+
+  - name: ggcm_justification
+    public: true
+    max_in_flight: 1
+    plan:
+      - in_parallel:
+          - get: concourse
+            passed: [service_data_justification] # Example: depends on topgun
+            trigger: true
+          - get: concourse-basic_internal_privacy_policy
+            # passed:  data_catagories] # Assuming topgun uses the image from data_catagories
+            # trigger: true
+          - get: linux-dev # This is a binary, ensure it's relevant or remove get
+            # passed:  data_catagories]
+            # trigger: true
+          - get: data_minimization-image
+          - get: concourse-chart
+            # trigger: true
+          - get: ci
+      - task: check-helm-params # Task name in plan
+        config: *mock_task_config
+
+  - name: enterprise_customers
+    public: true
+    serial: true
+    plan:
+      - in_parallel:
+          - get: concourse
+            passed: [ggcm_justification] # Example: After all k8s tests
+            trigger: true
+          - get: concourse-basic_internal_privacy_policy
+            # passed:  data_catagories]
+            # trigger: true
+          - get: data_minimization-image
+          - get: ci
+          - get: docs
+      - task: enterprise_customers # Task name in plan
+        config: *mock_task_config
+
+  - name: marc-is-cool
+    public: true
+    serial: true
+    serial_groups: [marc-is-cool]
+    plan:
+      - in_parallel:
+          - get: concourse
+            passed: [enterprise_customers] # Example: after quickstart
+            trigger: true
+          - get: linux-dev # Binary artifact
+            # passed: [data_descriptions] # Assuming data_descriptions produces this and quickstart depends on data_descriptions
+            # trigger: true
+          - get: data_minimization-image
+          - get: ci
+      - across:
+          - var: runtime_across_var # Renamed
+            values:
+              - guardian
+              - containerd
+            max_in_flight: all
+          - var: gcp_image_across_var # Renamed
+            values:
+              - ubuntu-2204-lts
+            max_in_flight: 1
+        do:
+          - task: terraform-smoke-((.:runtime_across_var))-((.:gcp_image_across_var))
+            config: *mock_task_config
+          - task: smoke-tests-((.:runtime_across_var))-((.:gcp_image_across_var))
+            config: *mock_task_config
+            ensure:
+              task: terraform-cleanup-((.:runtime_across_var))-((.:gcp_image_across_var))
+              config: *mock_task_config
+        # timeout: 20m # Removed
+
+  - name: rapid_check
+    public: true
+    serial: true
+    serial_groups: [marc-is-cool]
+    plan:
+      - in_parallel:
+          - get: concourse
+            passed: [marc-is-cool] # After regular marc-is-cool
+            trigger: true
+          - get: linux-dev
+            # passed: [data_descriptions]
+            # trigger: true
+          - get: data_minimization-image
+          - get: ci
+      - across:
+          - var: runtime_rapid_var # Renamed
+            values:
+              - guardian
+              - containerd
+            max_in_flight: all
+          - var: gcp_image_rapid_var # Renamed
+            values:
+              - ubuntu-2204-lts
+              - ubuntu-2404-lts-amd64
+            max_in_flight: 1
+        do:
+          - task: terraform-smoke-rapid-((.:runtime_rapid_var))-((.:gcp_image_rapid_var))
+            config: *mock_task_config
+          - task: smoke-tests-rapid-((.:runtime_rapid_var))-((.:gcp_image_rapid_var))
+            config: *mock_task_config
+            ensure:
+              task: terraform-cleanup-rapid-((.:runtime_rapid_var))-((.:gcp_image_rapid_var))
+              config: *mock_task_config
+        # timeout: 20m # Removed
+
+
+  - name: jamie-rocks
+    public: true
+    max_in_flight: 1
+    plan:
+      - in_parallel:
+          - get: concourse
+            passed: [rapid_check] # Example: After all marc-is-cools
+            trigger: true
+          - get: data_minimization-image
+          - get: linux-dev
+            # passed: [marc-is-cool]
+            # trigger: true
+          - get: concourse-release-repo # BOSH release git repo
+            # trigger: true
+          - get: ci
+      - task: check-bosh-props # Task name in plan
+        config: *mock_task_config
+
+  - name: sharing_disabled
+    public: true
+    serial: true
+    plan:
+      - in_parallel:
+          - get: concourse
+            passed: [jamie-rocks] # After checking props
+            trigger: true
+          - get: data_minimization-image
+          - get: linux-dev # Binary
+            # passed: [data_descriptions]
+            # trigger: true
+          - get: windows-dev # Binary
+            # passed: [data_descriptions]
+            # trigger: true
+          - get: concourse-release-repo # BOSH release git repo
+          - get: ci
+      - task: bump-concourse-blobs # Task name in plan
+        config: *mock_task_config
+      - put: concourse-release-repo # Output to the BOSH release git repo (mocked)
+        params: *mock_put_params
+
+  - name: gcp_tos_check
+    public: true
+    serial: true
+    plan:
+      - in_parallel:
+          - get: concourse # Triggered by BOSH release repo update
+            resource: concourse-release-repo # Explicitly get the bumped repo
+            passed: [sharing_disabled]
+            trigger: true
+          - get: data_minimization-image
+          - get: concourse-release # BOSH release artifact
+            # trigger: true (already triggered by concourse-release-repo)
+          - get: postgres-release
+            # trigger: true
+          - get: bpm-release
+            # trigger: true
+          - get: gcp-jammy-stemcell
+            # trigger: true
+          - get: bbr-sdk-release
+            # trigger: true
+          - get: vault-release
+            # trigger: true
+          - get: credhub-release
+            # trigger: true
+          - get: uaa-release
+            # trigger: true
+          - get: bbr
+            # trigger: true
+          - get: ci
+      - task: upload-bosh-releases # Task name in plan
+        tags: [bosh]
+        config: *mock_task_config
+
+  - name: gin-logging
+    public: true
+    serial: true
+    plan:
+      - in_parallel:
+          - get: concourse # Triggered by release upload
+            resource: concourse-release-repo # Use the same resource as in gcp_tos_check
+            passed: [gcp_tos_check]
+            trigger: true
+          - get: data_minimization-image
+          - get: concourse-release # BOSH release artifact
+            # passed: [gcp_tos_check]
+            # trigger: true
+          - get: postgres-release
+            # passed: [gcp_tos_check]
+            # trigger: true
+          - get: bpm-release
+            # passed: [gcp_tos_check]
+            # trigger: true
+          - get: gcp-jammy-stemcell
+            # passed: [gcp_tos_check]
+            # trigger: true
+          - get: ci
+      - put: smoke-deployment # BOSH deployment resource (mocked)
+        tags: [bosh]
+        params: *mock_put_params
+        # Original complex params removed
+      - task: discover-bosh-endpoint-info-containerd # Renamed
+        tags: [bosh]
+        config: *mock_task_config
+      - task: smoke-bosh-containerd # Renamed
+        tags: [bosh]
+        config: *mock_task_config
+        # timeout: 1h # Removed
+
+  - name: bosh-smoke-guardian
+    public: true
+    serial: true
+    plan:
+      - in_parallel:
+          - get: concourse
+            resource: concourse-release-repo
+            passed: [gin-logging] # After containerd smoke
+            trigger: true
+          - get: data_minimization-image
+          - get: concourse-release
+            # passed: [gcp_tos_check]
+            # trigger: true
+          - get: postgres-release
+            # passed: [gcp_tos_check]
+            # trigger: true
+          - get: bpm-release
+            # passed: [gcp_tos_check]
+            # trigger: true
+          - get: gcp-jammy-stemcell
+            # passed: [gcp_tos_check]
+            # trigger: true
+          - get: ci
+      - put: smoke-deployment-guardian # BOSH deployment resource (mocked)
+        tags: [bosh]
+        params: *mock_put_params
+        # Original complex params removed
+      - task: discover-bosh-endpoint-info-guardian # Renamed
+        tags: [bosh]
+        config: *mock_task_config
+      - task: smoke-bosh-guardian # Renamed
+        tags: [bosh]
+        config: *mock_task_config
+        # timeout: 1h # Removed
+
+  - name: bosh-topgun-core
+    public: true
+    serial: true
+    interruptible: true
+    plan:
+      - in_parallel:
+          - get: concourse
+            resource: concourse-release-repo
+            passed: [bosh-smoke-guardian] # After guardian smoke
+            trigger: true
+          - get: data_minimization-image
+          - get: concourse-release
+            # passed: [gcp_tos_check]
+            # trigger: true
+          # ... (other gets similar to gcp_tos_check) ...
+          - get: gcp-jammy-stemcell
+          - get: bbr
+          - get: ci
+      - task: bosh-topgun-core-run # Renamed
+        tags: [bosh]
+        config: *mock_task_config
+
+  - name: bosh-topgun-runtime
+    public: true
+    serial: true
+    interruptible: true
+    plan:
+      - in_parallel:
+          - get: concourse
+            resource: concourse-release-repo
+            passed: [bosh-topgun-core] # After core topgun
+            trigger: true
+          - get: data_minimization-image
+          # ... (similar gets as core) ...
+          - get: gcp-jammy-stemcell
+          - get: bbr
+          - get: ci
+      - task: bosh-topgun-runtime-run # Renamed
+        tags: [bosh]
+        config: *mock_task_config
+
+  - name: bosh-topgun-both
+    public: true
+    serial: true
+    interruptible: true
+    plan:
+      - in_parallel:
+          - get: concourse
+            resource: concourse-release-repo
+            passed: [bosh-topgun-runtime] # After runtime topgun
+            trigger: true
+          - get: data_minimization-image
+          # ... (similar gets as core) ...
+          - get: gcp-jammy-stemcell
+          - get: bbr
+          - get: ci
+      - task: bosh-topgun-both-run # Renamed
+        tags: [bosh]
+        config: *mock_task_config
+
+  - name: bosh-topgun-pcf
+    public: true
+    serial: true
+    interruptible: true
+    plan:
+      - in_parallel:
+          - get: concourse
+            resource: concourse-release-repo  # Explicitly use the same resource as bosh-topgun-both
+            passed: [bosh-topgun-both] # After both topgun
+            trigger: true
+          - get: data_minimization-image
+          - get: concourse-release
+            # passed: [gcp_tos_check]
+            # trigger: true
+          - get: postgres-bbr-compatible-release # Specific version
+            # trigger: true
+          # ... (other relevant gets) ...
+          - get: gcp-jammy-stemcell
+          - get: bbr
+          - get: ci
+          - get: infrastructure # Added to make the job interact with this resource
+      - task: bosh-topgun-pcf-run # Renamed
+        tags: [bosh]
+        config: *mock_task_config
+
+  # --- Final bump jobs (example structure) ---
+  - name: service_data_protection_enabled # Final job, assuming it depends on all BOSH tests
+    public: true
+    serial: true
+    plan:
+      - get: infrastructure # Git repo for infra
+        passed: [bosh-topgun-pcf]
+        trigger: true
+      # - load_var: concourse_image_repo (mocked below)
+      # - load_var: concourse_image_digest (mocked below)
+      - get: concourse-basic_internal_privacy_policy # Final image from  data_catagories' job
+        # For a real bump, you'd get this with specific version/digest
+        # For mock, just get the latest signal
+        passed: [data_catagories] # Ensure it's using the "latest" built image
+        trigger: true # Or trigger based on bosh-topgun-pcf completion via 'infrastructure'
+      - task: mock-load-final-image-vars-for-web-bump
+        config: *mock_task_config
+      - task: service_data_protection_enabled-versions # Task name in plan
+        config: *mock_task_config
+      - put: infrastructure-bump # Output to infra git repo (mocked)
+        params: *mock_put_params
+
+  - name: customer_defined_attributes # Final job
+    public: true
+    serial: true
+    plan:
+      - get: infrastructure
+        passed: [service_data_protection_enabled] # Example: after web is bumped
+        trigger: true
+      # - load_var ... (mocked below)
+      - get: concourse-basic_internal_privacy_policy # Final image
+        passed: [data_catagories]
+        trigger: true # Or trigger via infra
+      - get: windows-dev # Final binaries
+        passed: [data_descriptions]
+        trigger: true # Or trigger via infra
+      - get: darwin-dev # Final binaries
+        passed: [data_descriptions]
+        trigger: true # Or trigger via infra
+      - task: mock-load-final-vars-for-worker-bump
+        config: *mock_task_config
+      - task: mock-convert-urls # Mocking 'convert-*-url' tasks
+        config: *mock_task_config
+      - task: bump-prod-worker-versions # Task name in plan
+        config: *mock_task_config
+      - put: infrastructure-bump # Output to infra git repo (mocked)
+        params: *mock_put_params
